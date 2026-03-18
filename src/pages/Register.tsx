@@ -4,9 +4,13 @@ import { User, Mail, Phone, CreditCard, Lock, Recycle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Register = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     name: "", email: "", phone: "", cpf: "", password: "", confirmPassword: "",
   });
@@ -14,9 +18,44 @@ const Register = () => {
   const update = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate("/dashboard");
+
+    if (form.password !== form.confirmPassword) {
+      toast({ title: "Erro", description: "As senhas não coincidem.", variant: "destructive" });
+      return;
+    }
+
+    if (form.password.length < 6) {
+      toast({ title: "Erro", description: "A senha deve ter pelo menos 6 caracteres.", variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+
+    const { error } = await supabase.auth.signUp({
+      email: form.email,
+      password: form.password,
+      options: {
+        data: {
+          full_name: form.name,
+          phone: form.phone,
+          cpf: form.cpf,
+        },
+        emailRedirectTo: window.location.origin,
+      },
+    });
+
+    if (error) {
+      toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
+    } else {
+      toast({
+        title: "Conta criada com sucesso!",
+        description: "Verifique seu email para confirmar o cadastro.",
+      });
+      navigate("/dashboard");
+    }
+    setLoading(false);
   };
 
   const fields = [
@@ -57,13 +96,14 @@ const Register = () => {
                   className="pl-10"
                   value={form[id as keyof typeof form]}
                   onChange={update(id)}
+                  required={label.includes("*")}
                 />
               </div>
             </div>
           ))}
 
-          <Button type="submit" className="w-full" size="lg">
-            Criar conta
+          <Button type="submit" className="w-full" size="lg" disabled={loading}>
+            {loading ? "Criando conta..." : "Criar conta"}
           </Button>
         </form>
 

@@ -2,25 +2,47 @@ import { useState } from "react";
 import { Search, ShoppingBag, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
-const categories = ["Todos", "Descontos", "Vales", "Produtos Físicos"];
-
-const products = [
-  { id: 1, name: "Papelão", description: "", price: 52, tag: "Informativo", featured: true },
-  { id: 2, name: "Desconto 10% Supermercado", description: "Descontos de 10% em compras acima de R$ 50", price: 50, tag: "Informativo", featured: true },
-  { id: 3, name: "Vale Combustível R$ 20", description: "Vale combustível para postos parceiros", price: 100, tag: "Informativo", featured: true },
-  { id: 4, name: "Ecobag Sustentável", description: "Ecobag feita com material reciclado", price: 30, tag: "Informativo", featured: true },
-  { id: 5, name: "Cashback R$ 15", description: "Cashback em dinheiro", price: 75, tag: "Informativo", featured: false },
-  { id: 6, name: "Kit Limpeza Eco", description: "Kit de limpeza sustentável", price: 45, tag: "Informativo", featured: false },
-];
+const categories = ["Todos", "descontos", "vales", "produtos"];
+const categoryLabels: Record<string, string> = {
+  Todos: "Todos",
+  descontos: "Descontos",
+  vales: "Vales",
+  produtos: "Produtos Físicos",
+};
 
 const Loja = () => {
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Todos");
 
-  const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const { data: profile } = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("balance").eq("user_id", user!.id).single();
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const { data: products = [] } = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => {
+      const { data } = await supabase.from("products").select("*").order("featured", { ascending: false });
+      return data ?? [];
+    },
+    enabled: !!user,
+  });
+
+  const filtered = products.filter((p) => {
+    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
+    const matchCat = activeCategory === "Todos" || p.category === activeCategory;
+    return matchSearch && matchCat;
+  });
+
   const featured = filtered.filter((p) => p.featured);
 
   return (
@@ -32,22 +54,15 @@ const Loja = () => {
         </p>
       </div>
 
-      {/* Balance banner */}
       <div className="rounded-xl bg-gradient-to-r from-primary to-primary/80 px-6 py-4 text-primary-foreground">
         <p className="text-sm font-medium text-primary-foreground/80">Seu saldo atual</p>
-        <p className="text-2xl font-bold tabular-nums">0 Fênix Coins</p>
+        <p className="text-2xl font-bold tabular-nums">{Number(profile?.balance ?? 0)} Fênix Coins</p>
       </div>
 
-      {/* Search + Filters */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar produtos..."
-            className="pl-10"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <Input placeholder="Buscar produtos..." className="pl-10" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <div className="flex gap-2">
           {categories.map((cat) => (
@@ -61,13 +76,12 @@ const Loja = () => {
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               )}
             >
-              {cat}
+              {categoryLabels[cat]}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Featured */}
       {featured.length > 0 && (
         <section>
           <h2 className="mb-4 text-lg font-semibold text-foreground">Produtos em Destaque</h2>
@@ -79,7 +93,6 @@ const Loja = () => {
         </section>
       )}
 
-      {/* All Products */}
       <section>
         <h2 className="mb-4 text-lg font-semibold text-foreground">Todos os Produtos</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -87,9 +100,14 @@ const Loja = () => {
             <ProductCard key={product.id} product={product} />
           ))}
         </div>
+        {filtered.length === 0 && (
+          <div className="flex flex-col items-center py-12 text-center">
+            <ShoppingBag className="mb-3 h-10 w-10 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Nenhum produto encontrado.</p>
+          </div>
+        )}
       </section>
 
-      {/* Info */}
       <div className="rounded-xl bg-accent p-5">
         <div className="flex items-start gap-3">
           <Info className="mt-0.5 h-5 w-5 text-accent-foreground" />
@@ -105,7 +123,17 @@ const Loja = () => {
   );
 };
 
-const ProductCard = ({ product }: { product: typeof products[0] }) => (
+interface ProductType {
+  id: string;
+  name: string;
+  description: string | null;
+  price_fc: number;
+  category: string;
+  image_url: string | null;
+  featured: boolean;
+}
+
+const ProductCard = ({ product }: { product: ProductType }) => (
   <div className="group rounded-xl bg-card p-4 shadow-card transition-shadow hover:shadow-card-hover">
     <div className="mb-3 flex h-32 items-center justify-center rounded-lg bg-muted">
       <ShoppingBag className="h-8 w-8 text-muted-foreground transition-transform group-hover:scale-110" />
@@ -115,8 +143,8 @@ const ProductCard = ({ product }: { product: typeof products[0] }) => (
       <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{product.description}</p>
     )}
     <div className="mt-3 flex items-center justify-between">
-      <span className="text-sm font-bold text-primary tabular-nums">{product.price} FC</span>
-      <span className="text-xs text-muted-foreground">{product.tag}</span>
+      <span className="text-sm font-bold text-primary tabular-nums">{Number(product.price_fc)} FC</span>
+      <span className="text-xs text-muted-foreground">Informativo</span>
     </div>
   </div>
 );

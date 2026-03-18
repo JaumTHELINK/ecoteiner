@@ -1,22 +1,49 @@
 import { useState } from "react";
 import { Search, Download, ArrowUpCircle, ArrowDownCircle, Wallet, DollarSign } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 const Extrato = () => {
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [tipo, setTipo] = useState("Todos");
   const [categoria, setCategoria] = useState("Todas");
+
+  const { data: transactions = [] } = useQuery({
+    queryKey: ["transactions", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", user!.id)
+        .order("created_at", { ascending: false });
+      return data ?? [];
+    },
+    enabled: !!user,
+  });
+
+  const filtered = transactions.filter((t) => {
+    const matchSearch = t.description.toLowerCase().includes(search.toLowerCase());
+    const matchType = tipo === "Todos" || (tipo === "Recebido" && t.type === "credit") || (tipo === "Gasto" && t.type === "debit");
+    const matchCat = categoria === "Todas" || t.category === categoria.toLowerCase();
+    return matchSearch && matchType && matchCat;
+  });
+
+  const totalReceived = transactions.filter((t) => t.type === "credit").reduce((s, t) => s + Number(t.amount), 0);
+  const totalSpent = transactions.filter((t) => t.type === "debit").reduce((s, t) => s + Number(t.amount), 0);
+  const currentBalance = totalReceived - totalSpent;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Extrato de Transações</h1>
-        <p className="text-sm text-muted-foreground">
-          Acompanhe todas as suas movimentações de Fênix Coins
-        </p>
+        <p className="text-sm text-muted-foreground">Acompanhe todas as suas movimentações de Fênix Coins</p>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="flex items-center gap-4 rounded-xl bg-card p-5 shadow-card">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent">
@@ -24,7 +51,7 @@ const Extrato = () => {
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Total Recebido</p>
-            <p className="text-xl font-bold text-primary tabular-nums">+0 FC</p>
+            <p className="text-xl font-bold text-primary tabular-nums">+{totalReceived} FC</p>
           </div>
         </div>
         <div className="flex items-center gap-4 rounded-xl bg-card p-5 shadow-card">
@@ -33,7 +60,7 @@ const Extrato = () => {
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Total Gasto</p>
-            <p className="text-xl font-bold text-destructive tabular-nums">-0 FC</p>
+            <p className="text-xl font-bold text-destructive tabular-nums">-{totalSpent} FC</p>
           </div>
         </div>
         <div className="flex items-center gap-4 rounded-xl bg-card p-5 shadow-card">
@@ -42,36 +69,24 @@ const Extrato = () => {
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Saldo Atual</p>
-            <p className="text-xl font-bold text-foreground tabular-nums">0 FC</p>
+            <p className="text-xl font-bold text-foreground tabular-nums">{currentBalance} FC</p>
           </div>
         </div>
       </div>
 
-      {/* Filters */}
       <div className="rounded-xl bg-card p-6 shadow-card">
-        <h2 className="mb-4 flex items-center gap-2 font-semibold text-foreground">
-          <span className="text-muted-foreground">🔍</span> Filtros
-        </h2>
+        <h2 className="mb-4 flex items-center gap-2 font-semibold text-foreground">🔍 Filtros</h2>
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">Buscar</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por descrição..."
-                className="pl-10"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+              <Input placeholder="Buscar por descrição..." className="pl-10" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">Tipo</label>
-            <select
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
-              value={tipo}
-              onChange={(e) => setTipo(e.target.value)}
-            >
+            <select className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground" value={tipo} onChange={(e) => setTipo(e.target.value)}>
               <option>Todos</option>
               <option>Recebido</option>
               <option>Gasto</option>
@@ -79,11 +94,7 @@ const Extrato = () => {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">Categoria</label>
-            <select
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
-              value={categoria}
-              onChange={(e) => setCategoria(e.target.value)}
-            >
+            <select className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
               <option>Todas</option>
               <option>Reciclagem</option>
               <option>Troca</option>
@@ -93,26 +104,51 @@ const Extrato = () => {
         </div>
       </div>
 
-      {/* Transaction History */}
       <div className="rounded-xl bg-card p-6 shadow-card">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="font-semibold text-foreground">Histórico de Transações</h2>
-            <p className="text-xs text-muted-foreground">0 transação(ões) encontrada(s)</p>
+            <p className="text-xs text-muted-foreground">{filtered.length} transação(ões) encontrada(s)</p>
           </div>
           <button className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent">
-            <Download className="h-4 w-4" />
-            Exportar
+            <Download className="h-4 w-4" /> Exportar
           </button>
         </div>
 
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-            <DollarSign className="h-8 w-8 text-muted-foreground" />
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+              <DollarSign className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium text-foreground">Nenhuma transação encontrada</p>
+            <p className="text-xs text-muted-foreground">Você ainda não possui transações registradas.</p>
           </div>
-          <p className="text-sm font-medium text-foreground">Nenhuma transação encontrada</p>
-          <p className="text-xs text-muted-foreground">Você ainda não possui transações registradas.</p>
-        </div>
+        ) : (
+          <div className="space-y-3">
+            {filtered.map((t) => (
+              <div key={t.id} className="flex items-center justify-between rounded-lg border border-border p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-full ${t.type === "credit" ? "bg-accent" : "bg-destructive/10"}`}>
+                    {t.type === "credit" ? (
+                      <ArrowUpCircle className="h-4 w-4 text-primary" />
+                    ) : (
+                      <ArrowDownCircle className="h-4 w-4 text-destructive" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{t.description}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(t.created_at), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: ptBR })}
+                    </p>
+                  </div>
+                </div>
+                <span className={`text-sm font-bold tabular-nums ${t.type === "credit" ? "text-primary" : "text-destructive"}`}>
+                  {t.type === "credit" ? "+" : "-"}{Number(t.amount)} FC
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
