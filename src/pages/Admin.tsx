@@ -67,6 +67,7 @@ const Admin = () => {
       {/* Tab Content */}
       {activeTab === "users" && <AdminUsers />}
       {activeTab === "products" && <AdminProducts />}
+      {activeTab === "rates" && <AdminMaterialRates />}
       {activeTab === "points" && <AdminCollectionPoints />}
       {activeTab === "transactions" && <AdminTransactions />}
       {activeTab === "reports" && <AdminReports />}

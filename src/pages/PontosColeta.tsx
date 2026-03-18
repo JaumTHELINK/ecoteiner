@@ -1,10 +1,13 @@
-import { MapPin, Phone, Clock, ExternalLink, Info } from "lucide-react";
+import { useState } from "react";
+import { MapPin, Phone, Clock, ExternalLink, Info, ChevronDown, ChevronUp, Coins } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
 
 const PontosColeta = () => {
   const { user } = useAuth();
+  const [showRates, setShowRates] = useState(false);
 
   const { data: pontos = [] } = useQuery({
     queryKey: ["collection-points"],
@@ -33,22 +36,73 @@ const PontosColeta = () => {
         </p>
       </div>
 
+      {/* Material Rates Toggle */}
+      <div className="rounded-xl bg-card shadow-card overflow-hidden">
+        <button
+          onClick={() => setShowRates(!showRates)}
+          className="flex w-full items-center justify-between px-6 py-4 text-left transition-colors hover:bg-muted/30"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <Coins className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Tabela de Pontos</p>
+              <p className="text-xs text-muted-foreground">Veja quanto vale cada material em Fênix Coins</p>
+            </div>
+          </div>
+          {showRates ? (
+            <ChevronUp className="h-5 w-5 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-muted-foreground" />
+          )}
+        </button>
+
+        {showRates && (
+          <div className="border-t border-border">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50">
+                    <th className="px-6 py-3 text-left font-medium text-muted-foreground">Material</th>
+                    <th className="px-6 py-3 text-center font-medium text-muted-foreground">Quantidade</th>
+                    <th className="px-6 py-3 text-center font-medium text-muted-foreground">Pontos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rates.map((rate) => (
+                    <tr key={rate.id} className="border-t border-border hover:bg-muted/20">
+                      <td className="px-6 py-3 font-medium text-foreground">{rate.material}</td>
+                      <td className="px-6 py-3 text-center tabular-nums text-muted-foreground">
+                        {Number(rate.quantity_per_fenix)} {rate.unit}
+                      </td>
+                      <td className="px-6 py-3 text-center">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary tabular-nums">
+                          🪙 {Number(rate.fenix_per_unit)} fênix
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="border-t border-border bg-muted/30 px-6 py-3">
+              <p className="text-xs text-muted-foreground">
+                <span className="font-semibold">Obs.:</span> 🪙 1 fênix = R$ 1,00 — Dúvidas sobre o que pontua? Entre em contato conosco.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="rounded-xl bg-accent p-5">
         <div className="flex items-start gap-3">
           <Info className="mt-0.5 h-5 w-5 text-accent-foreground" />
           <div>
             <p className="font-semibold text-accent-foreground">Como funciona?</p>
-            <p className="mb-3 text-sm text-accent-foreground/80">
+            <p className="text-sm text-accent-foreground/80">
               Leve seus materiais recicláveis aos pontos de coleta para ganhar Fênix Coins e trocar por produtos e benefícios.
             </p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {rates.slice(0, 8).map((rate) => (
-                <div key={rate.id} className="text-sm text-accent-foreground">
-                  <span className="font-medium">• {rate.material}:</span>{" "}
-                  <span className="tabular-nums">{Number(rate.fenix_per_unit)} FC / {Number(rate.quantity_per_fenix)} {rate.unit}</span>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </div>
