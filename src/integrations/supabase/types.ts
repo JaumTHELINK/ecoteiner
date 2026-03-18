@@ -14,7 +14,203 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      collection_points: {
+        Row: {
+          active: boolean
+          address: string
+          created_at: string
+          hours: string | null
+          id: string
+          lat: number | null
+          lng: number | null
+          name: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          address: string
+          created_at?: string
+          hours?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          name: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          address?: string
+          created_at?: string
+          hours?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          name?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      material_rates: {
+        Row: {
+          active: boolean
+          fenix_per_unit: number
+          id: string
+          material: string
+          quantity_per_fenix: number
+          unit: string
+        }
+        Insert: {
+          active?: boolean
+          fenix_per_unit?: number
+          id?: string
+          material: string
+          quantity_per_fenix: number
+          unit?: string
+        }
+        Update: {
+          active?: boolean
+          fenix_per_unit?: number
+          id?: string
+          material?: string
+          quantity_per_fenix?: number
+          unit?: string
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          active: boolean
+          category: string
+          created_at: string
+          description: string | null
+          featured: boolean
+          id: string
+          image_url: string | null
+          name: string
+          price_fc: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category?: string
+          created_at?: string
+          description?: string | null
+          featured?: boolean
+          id?: string
+          image_url?: string | null
+          name: string
+          price_fc?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category?: string
+          created_at?: string
+          description?: string | null
+          featured?: boolean
+          id?: string
+          image_url?: string | null
+          name?: string
+          price_fc?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          balance: number
+          cpf: string | null
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          level: string
+          month_recycled_kg: number
+          phone: string | null
+          total_recycled_kg: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          cpf?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          level?: string
+          month_recycled_kg?: number
+          phone?: string | null
+          total_recycled_kg?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          cpf?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          level?: string
+          month_recycled_kg?: number
+          phone?: string | null
+          total_recycled_kg?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          category: string
+          collection_point_id: string | null
+          created_at: string
+          description: string
+          id: string
+          material: string | null
+          type: string
+          user_id: string
+          weight_kg: number | null
+        }
+        Insert: {
+          amount: number
+          category?: string
+          collection_point_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          material?: string | null
+          type: string
+          user_id: string
+          weight_kg?: number | null
+        }
+        Update: {
+          amount?: number
+          category?: string
+          collection_point_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          material?: string | null
+          type?: string
+          user_id?: string
+          weight_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_collection_point_id_fkey"
+            columns: ["collection_point_id"]
+            isOneToOne: false
+            referencedRelation: "collection_points"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
