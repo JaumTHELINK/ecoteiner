@@ -32,8 +32,8 @@ const AdminTransactions = () => {
 
   const filtered = transactions.filter((t: any) =>
     t.description.toLowerCase().includes(search.toLowerCase()) ||
-    t.profiles?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-    t.profiles?.email?.toLowerCase().includes(search.toLowerCase())
+    t.profile?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+    t.profile?.email?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
