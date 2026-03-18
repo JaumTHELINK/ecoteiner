@@ -136,8 +136,12 @@ interface ProductType {
 
 const ProductCard = ({ product }: { product: ProductType }) => (
   <Link to={`/loja/${product.id}`} className="group rounded-xl bg-card p-4 shadow-card transition-shadow hover:shadow-card-hover block">
-    <div className="mb-3 flex h-32 items-center justify-center rounded-lg bg-muted">
-      <ShoppingBag className="h-8 w-8 text-muted-foreground transition-transform group-hover:scale-110" />
+    <div className="mb-3 flex h-32 items-center justify-center rounded-lg bg-muted overflow-hidden">
+      {product.image_url ? (
+        <img src={product.image_url} alt={product.name} className="h-full w-full object-cover transition-transform group-hover:scale-110" />
+      ) : (
+        <ShoppingBag className="h-8 w-8 text-muted-foreground transition-transform group-hover:scale-110" />
+      )}
     </div>
     <p className="text-sm font-medium text-foreground">{product.name}</p>
     {product.description && (
