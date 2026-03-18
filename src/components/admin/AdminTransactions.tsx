@@ -14,10 +14,19 @@ const AdminTransactions = () => {
     queryFn: async () => {
       const { data } = await supabase
         .from("transactions")
-        .select("*, profiles!transactions_user_id_fkey(full_name, email)")
+        .select("*")
         .order("created_at", { ascending: false })
         .limit(200);
-      return data ?? [];
+      
+      // Fetch user names separately
+      const userIds = [...new Set((data ?? []).map(t => t.user_id))];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, full_name, email")
+        .in("user_id", userIds);
+      
+      const profileMap = new Map((profiles ?? []).map(p => [p.user_id, p]));
+      return (data ?? []).map(t => ({ ...t, profile: profileMap.get(t.user_id) }));
     },
   });
 
