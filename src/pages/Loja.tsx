@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Search, ShoppingBag, Info } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
