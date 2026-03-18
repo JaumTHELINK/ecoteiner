@@ -61,7 +61,7 @@ const AdminTransactions = () => {
                   <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                     {format(new Date(t.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}
                   </td>
-                  <td className="px-4 py-3 text-foreground">{t.profiles?.full_name || t.profiles?.email || "—"}</td>
+                  <td className="px-4 py-3 text-foreground">{t.profile?.full_name || t.profile?.email || "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground">{t.description}</td>
                   <td className="px-4 py-3 text-muted-foreground capitalize">{t.category}</td>
                   <td className="px-4 py-3 text-right">
