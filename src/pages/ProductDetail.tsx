@@ -82,9 +82,6 @@ const ProductDetail = () => {
               </p>
             </div>
 
-            <Button className="mt-6 w-full" size="lg">
-              COMPRAR
-            </Button>
 
             <p className="mt-3 text-xs text-muted-foreground underline cursor-pointer">
               Políticas de garantia e troca de produtos
