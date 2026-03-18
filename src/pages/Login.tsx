@@ -4,15 +4,34 @@ import { Mail, Lock, Recycle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate("/dashboard");
+    setLoading(true);
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      toast({
+        title: "Erro ao entrar",
+        description: error.message === "Invalid login credentials"
+          ? "Email ou senha incorretos."
+          : error.message,
+        variant: "destructive",
+      });
+    } else {
+      navigate("/dashboard");
+    }
+    setLoading(false);
   };
 
   return (
@@ -45,6 +64,7 @@ const Login = () => {
                 className="pl-10"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                required
               />
             </div>
           </div>
@@ -60,12 +80,13 @@ const Login = () => {
                 className="pl-10"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                required
               />
             </div>
           </div>
 
-          <Button type="submit" className="w-full" size="lg">
-            Entrar
+          <Button type="submit" className="w-full" size="lg" disabled={loading}>
+            {loading ? "Entrando..." : "Entrar"}
           </Button>
         </form>
 
