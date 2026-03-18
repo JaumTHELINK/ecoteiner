@@ -135,7 +135,7 @@ interface ProductType {
 }
 
 const ProductCard = ({ product }: { product: ProductType }) => (
-  <div className="group rounded-xl bg-card p-4 shadow-card transition-shadow hover:shadow-card-hover">
+  <Link to={`/loja/${product.id}`} className="group rounded-xl bg-card p-4 shadow-card transition-shadow hover:shadow-card-hover block">
     <div className="mb-3 flex h-32 items-center justify-center rounded-lg bg-muted">
       <ShoppingBag className="h-8 w-8 text-muted-foreground transition-transform group-hover:scale-110" />
     </div>
@@ -147,7 +147,7 @@ const ProductCard = ({ product }: { product: ProductType }) => (
       <span className="text-sm font-bold text-primary tabular-nums">{Number(product.price_fc)} FC</span>
       <span className="text-xs text-muted-foreground">Informativo</span>
     </div>
-  </div>
+  </Link>
 );
 
 export default Loja;
