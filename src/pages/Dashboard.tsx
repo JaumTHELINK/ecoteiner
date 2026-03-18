@@ -1,8 +1,17 @@
-import { Coins, Scale, TrendingUp, Award, ShoppingBag, MapPin, ArrowRight } from "lucide-react";
+import { Coins, Scale, TrendingUp, Award, ShoppingBag, MapPin, ArrowRight, Receipt } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+
+const getLevel = (totalKg: number) => {
+  if (totalKg >= 500) return "Mestre Eco";
+  if (totalKg >= 200) return "Especialista";
+  if (totalKg >= 100) return "Avançado";
+  if (totalKg >= 50) return "Intermediário";
+  if (totalKg >= 10) return "Aprendiz";
+  return "Iniciante";
+};
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -16,6 +25,18 @@ const Dashboard = () => {
         .eq("user_id", user!.id)
         .single();
       return data;
+    },
+    enabled: !!user,
+  });
+
+  const { data: transactions = [] } = useQuery({
+    queryKey: ["user-transactions", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", user!.id);
+      return data ?? [];
     },
     enabled: !!user,
   });
@@ -35,14 +56,27 @@ const Dashboard = () => {
 
   const displayName = profile?.full_name || user?.email?.split("@")[0] || "Usuário";
   const balance = Number(profile?.balance ?? 0);
-  const totalKg = Number(profile?.total_recycled_kg ?? 0);
-  const monthKg = Number(profile?.month_recycled_kg ?? 0);
-  const level = profile?.level ?? "Iniciante";
+
+  const totalKg = transactions
+    .filter(t => t.weight_kg)
+    .reduce((sum, t) => sum + Number(t.weight_kg), 0);
+
+  const now = new Date();
+  const monthKg = transactions
+    .filter(t => {
+      if (!t.weight_kg) return false;
+      const d = new Date(t.created_at);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    })
+    .reduce((sum, t) => sum + Number(t.weight_kg), 0);
+
+  const totalTransactions = transactions.length;
+  const level = getLevel(totalKg);
 
   const statsCards = [
     { label: "Saldo Atual", value: `${balance}`, subtitle: "Fênix Coins", icon: Coins, highlight: true },
-    { label: "Total Reciclado", value: `${totalKg} kg`, subtitle: "Desde o início", icon: Scale },
-    { label: "Este Mês", value: `${monthKg} kg`, subtitle: "+12% vs mês anterior", icon: TrendingUp },
+    { label: "Total Reciclado", value: `${totalKg.toFixed(1)} kg`, subtitle: `${totalTransactions} transações`, icon: Scale },
+    { label: "Este Mês", value: `${monthKg.toFixed(1)} kg`, subtitle: new Date().toLocaleString("pt-BR", { month: "long", year: "numeric" }), icon: TrendingUp },
     { label: "Nível", value: level, subtitle: "Continue reciclando!", icon: Award },
   ];
 
