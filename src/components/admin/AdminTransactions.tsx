@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -6,15 +6,24 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, ArrowUpCircle, ArrowDownCircle, Plus } from "lucide-react";
-import { format } from "date-fns";
+import { Search, ArrowUpCircle, ArrowDownCircle, Plus, CalendarIcon, Check, ChevronsUpDown } from "lucide-react";
+import { format, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const AdminTransactions = () => {
   const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
+
   const [open, setOpen] = useState(false);
+  const [userPopoverOpen, setUserPopoverOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState("");
   const [selectedMaterial, setSelectedMaterial] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -67,6 +76,7 @@ const AdminTransactions = () => {
   });
 
   const selectedMaterialData = materials.find(m => m.id === selectedMaterial);
+  const selectedProfile = profiles.find(p => p.user_id === selectedUser);
   const calculatedFC = selectedMaterialData && quantity
     ? (Number(quantity) / selectedMaterialData.quantity_per_fenix) * selectedMaterialData.fenix_per_unit
     : 0;
@@ -89,7 +99,6 @@ const AdminTransactions = () => {
       });
       if (txError) throw txError;
 
-      // Update user balance
       const { data: profile } = await supabase
         .from("profiles")
         .select("balance")
@@ -122,14 +131,28 @@ const AdminTransactions = () => {
     setDescription("");
   };
 
-  const filtered = transactions.filter((t: any) =>
-    t.description?.toLowerCase().includes(search.toLowerCase()) ||
-    t.profile?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-    t.profile?.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    return transactions.filter((t: any) => {
+      const matchesSearch =
+        t.description?.toLowerCase().includes(search.toLowerCase()) ||
+        t.profile?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+        t.profile?.email?.toLowerCase().includes(search.toLowerCase());
+
+      const matchesType = typeFilter === "all" || t.type === typeFilter;
+
+      const txDate = new Date(t.created_at);
+      const matchesFrom = !dateFrom || !isBefore(txDate, startOfDay(dateFrom));
+      const matchesTo = !dateTo || !isAfter(txDate, endOfDay(dateTo));
+
+      return matchesSearch && matchesType && matchesFrom && matchesTo;
+    });
+  }, [transactions, search, typeFilter, dateFrom, dateTo]);
+
+  const hasActiveFilters = typeFilter !== "all" || dateFrom || dateTo;
 
   return (
     <div className="space-y-4">
+      {/* Top bar: search + new transaction */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -147,18 +170,45 @@ const AdminTransactions = () => {
               <DialogTitle>Registrar Reciclagem</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-2">
+              {/* User combobox with search */}
               <div className="space-y-2">
                 <Label>Usuário *</Label>
-                <Select value={selectedUser} onValueChange={setSelectedUser}>
-                  <SelectTrigger><SelectValue placeholder="Selecione um usuário" /></SelectTrigger>
-                  <SelectContent>
-                    {profiles.map(p => (
-                      <SelectItem key={p.user_id} value={p.user_id}>
-                        {p.full_name || p.email}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={userPopoverOpen} onOpenChange={setUserPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                      {selectedProfile
+                        ? (selectedProfile.full_name || selectedProfile.email)
+                        : "Buscar usuário..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Digite o nome ou email..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum usuário encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {profiles.map(p => (
+                            <CommandItem
+                              key={p.user_id}
+                              value={`${p.full_name} ${p.email}`}
+                              onSelect={() => {
+                                setSelectedUser(p.user_id);
+                                setUserPopoverOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", selectedUser === p.user_id ? "opacity-100" : "opacity-0")} />
+                              <div className="flex flex-col">
+                                <span>{p.full_name || "Sem nome"}</span>
+                                <span className="text-xs text-muted-foreground">{p.email}</span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="space-y-2">
@@ -229,6 +279,51 @@ const AdminTransactions = () => {
         </Dialog>
       </div>
 
+      {/* Filters row */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Tipo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os tipos</SelectItem>
+            <SelectItem value="credit">Crédito</SelectItem>
+            <SelectItem value="debit">Débito</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Data início"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
+          </PopoverContent>
+        </Popover>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {dateTo ? format(dateTo, "dd/MM/yyyy") : "Data fim"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
+          </PopoverContent>
+        </Popover>
+
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={() => { setTypeFilter("all"); setDateFrom(undefined); setDateTo(undefined); }}>
+            Limpar filtros
+          </Button>
+        )}
+      </div>
+
+      {/* Table */}
       <div className="rounded-xl bg-card shadow-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
