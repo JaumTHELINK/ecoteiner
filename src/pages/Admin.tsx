@@ -1,0 +1,75 @@
+import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Navigate, Link, useLocation } from "react-router-dom";
+import { Users, ShoppingBag, MapPin, Receipt, BarChart3, Settings } from "lucide-react";
+import { cn } from "@/lib/utils";
+import AdminUsers from "@/components/admin/AdminUsers";
+import AdminProducts from "@/components/admin/AdminProducts";
+import AdminCollectionPoints from "@/components/admin/AdminCollectionPoints";
+import AdminTransactions from "@/components/admin/AdminTransactions";
+import AdminReports from "@/components/admin/AdminReports";
+
+const tabs = [
+  { id: "users", label: "Usuários", icon: Users },
+  { id: "products", label: "Produtos", icon: ShoppingBag },
+  { id: "points", label: "Pontos de Coleta", icon: MapPin },
+  { id: "transactions", label: "Transações", icon: Receipt },
+  { id: "reports", label: "Relatórios", icon: BarChart3 },
+];
+
+const Admin = () => {
+  const { isAdmin, loading } = useAuth();
+  const [activeTab, setActiveTab] = useState("users");
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground">
+          <Settings className="h-6 w-6 text-muted-foreground" />
+          Painel Administrativo
+        </h1>
+        <p className="text-sm text-muted-foreground">Gerencie usuários, produtos, pontos e transações.</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-2 border-b border-border pb-2">
+        {tabs.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            className={cn(
+              "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+              activeTab === id
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === "users" && <AdminUsers />}
+      {activeTab === "products" && <AdminProducts />}
+      {activeTab === "points" && <AdminCollectionPoints />}
+      {activeTab === "transactions" && <AdminTransactions />}
+      {activeTab === "reports" && <AdminReports />}
+    </div>
+  );
+};
+
+export default Admin;

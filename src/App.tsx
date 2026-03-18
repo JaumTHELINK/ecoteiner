@@ -8,8 +8,10 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Loja from "./pages/Loja";
+import ProductDetail from "./pages/ProductDetail";
 import PontosColeta from "./pages/PontosColeta";
 import Extrato from "./pages/Extrato";
+import Admin from "./pages/Admin";
 import DashboardLayout from "./components/DashboardLayout";
 import NotFound from "./pages/NotFound";
 
@@ -28,8 +30,10 @@ const App = () => (
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/loja" element={<Loja />} />
+              <Route path="/loja/:id" element={<ProductDetail />} />
               <Route path="/pontos" element={<PontosColeta />} />
               <Route path="/extrato" element={<Extrato />} />
+              <Route path="/admin" element={<Admin />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
