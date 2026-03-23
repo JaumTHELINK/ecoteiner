@@ -141,17 +141,46 @@ const PontosColeta = () => {
                   </div>
                 </div>
               )}
+              {/* Accepted materials */}
+              {(() => {
+                const mats = (ponto as any).accepted_materials || [];
+                return mats.length > 0 ? (
+                  <div className="flex items-start gap-3">
+                    <Recycle className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium text-foreground">Materiais Aceitos</p>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {mats.map((m: string) => (
+                          <Badge key={m} variant="secondary" className="text-xs">{m}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : null;
+              })()}
             </div>
             <div className="mt-4 flex gap-2">
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${ponto.lat},${ponto.lng}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-              >
-                <ExternalLink className="h-4 w-4" />
-                Ver no Mapa
-              </a>
+              {ponto.lat && ponto.lng ? (
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${ponto.lat},${ponto.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Ver no Mapa
+                </a>
+              ) : (
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ponto.address)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Ver no Mapa
+                </a>
+              )}
               {ponto.phone && (
                 <a
                   href={`tel:${ponto.phone}`}
