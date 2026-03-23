@@ -1,4 +1,4 @@
-import { Coins, Scale, TrendingUp, Award, ShoppingBag, MapPin, ArrowRight, Receipt } from "lucide-react";
+import { Coins, Scale, TrendingUp, Award, ShoppingBag, MapPin, ArrowRight, Receipt, Megaphone } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
