@@ -7,13 +7,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-const categories = ["Todos", "descontos", "vales", "produtos"];
-const categoryLabels: Record<string, string> = {
-  Todos: "Todos",
-  descontos: "Descontos",
-  vales: "Vales",
-  produtos: "Produtos Físicos",
-};
 
 const Loja = () => {
   const { user } = useAuth();
@@ -28,6 +21,21 @@ const Loja = () => {
     },
     enabled: !!user,
   });
+
+  const { data: dbCategories = [] } = useQuery({
+    queryKey: ["product-categories"],
+    queryFn: async () => {
+      const { data } = await supabase.from("product_categories").select("*").eq("active", true).order("label");
+      return data ?? [];
+    },
+    enabled: !!user,
+  });
+
+  const categories = ["Todos", ...dbCategories.map(c => c.name)];
+  const categoryLabels: Record<string, string> = {
+    Todos: "Todos",
+    ...Object.fromEntries(dbCategories.map(c => [c.name, c.label])),
+  };
 
   const { data: products = [] } = useQuery({
     queryKey: ["products"],

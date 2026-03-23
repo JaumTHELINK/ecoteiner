@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Upload, X, Image as ImageIcon, RotateCcw, Eye, EyeOff } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Pencil, Trash2, Upload, X, Image as ImageIcon, RotateCcw, Eye, EyeOff, PlusCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ProductForm {
@@ -28,6 +29,16 @@ const AdminProducts = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [newCategoryLabel, setNewCategoryLabel] = useState("");
+  const [showNewCategory, setShowNewCategory] = useState(false);
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["product-categories"],
+    queryFn: async () => {
+      const { data } = await supabase.from("product_categories").select("*").order("label");
+      return data ?? [];
+    },
+  });
 
   const { data: allProducts = [] } = useQuery({
     queryKey: ["admin-products-all"],
@@ -35,6 +46,23 @@ const AdminProducts = () => {
       const { data } = await supabase.from("products").select("*").order("created_at", { ascending: false });
       return data ?? [];
     },
+  });
+
+  const createCategoryMut = useMutation({
+    mutationFn: async (label: string) => {
+      const name = label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+      const { error } = await supabase.from("product_categories").insert({ name, label });
+      if (error) throw error;
+      return name;
+    },
+    onSuccess: (name) => {
+      queryClient.invalidateQueries({ queryKey: ["product-categories"] });
+      setForm(f => ({ ...f, category: name }));
+      setNewCategoryLabel("");
+      setShowNewCategory(false);
+      toast({ title: "Categoria criada!" });
+    },
+    onError: (err: any) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
   });
 
   const products = showInactive ? allProducts : allProducts.filter(p => p.active);
@@ -137,7 +165,34 @@ const AdminProducts = () => {
           <div className="grid gap-3 sm:grid-cols-2">
             <Input placeholder="Nome" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
             <Input placeholder="Preço (FC)" type="number" value={form.price_fc} onChange={e => setForm(f => ({ ...f, price_fc: e.target.value }))} />
-            <Input placeholder="Categoria" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} />
+            <div className="space-y-2">
+              <Select value={form.category} onValueChange={v => {
+                if (v === "__new__") {
+                  setShowNewCategory(true);
+                } else {
+                  setForm(f => ({ ...f, category: v }));
+                }
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(c => (
+                    <SelectItem key={c.id} value={c.name}>{c.label}</SelectItem>
+                  ))}
+                  <SelectItem value="__new__">
+                    <span className="flex items-center gap-1"><PlusCircle className="h-3 w-3" /> Nova categoria</span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {showNewCategory && (
+                <div className="flex gap-2">
+                  <Input placeholder="Nome da nova categoria" value={newCategoryLabel} onChange={e => setNewCategoryLabel(e.target.value)} />
+                  <Button type="button" size="sm" onClick={() => newCategoryLabel && createCategoryMut.mutate(newCategoryLabel)} disabled={!newCategoryLabel}>Criar</Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setShowNewCategory(false)}>Cancelar</Button>
+                </div>
+              )}
+            </div>
             <label className="flex items-center gap-2 text-sm text-foreground">
               <input type="checkbox" checked={form.featured} onChange={e => setForm(f => ({ ...f, featured: e.target.checked }))} className="rounded" />
               Destaque
