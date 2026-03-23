@@ -65,6 +65,18 @@ const AdminProducts = () => {
     onError: (err: any) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
   });
 
+  const deleteCategoryMut = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("product_categories").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["product-categories"] });
+      toast({ title: "Categoria excluída!" });
+    },
+    onError: (err: any) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
+  });
+
   const products = showInactive ? allProducts : allProducts.filter(p => p.active);
 
   const uploadImage = async (file: File): Promise<string> => {
@@ -192,6 +204,20 @@ const AdminProducts = () => {
                   <Button type="button" size="sm" variant="ghost" onClick={() => setShowNewCategory(false)}>Cancelar</Button>
                 </div>
               )}
+              <div className="flex flex-wrap gap-1">
+                {categories.map(c => (
+                  <Badge key={c.id} variant="secondary" className="flex items-center gap-1 text-xs">
+                    {c.label}
+                    <button
+                      type="button"
+                      onClick={() => { if (confirm(`Excluir categoria "${c.label}"?`)) deleteCategoryMut.mutate(c.id); }}
+                      className="ml-0.5 rounded-full hover:bg-destructive/20 p-0.5"
+                    >
+                      <X className="h-3 w-3 text-destructive" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
             </div>
             <label className="flex items-center gap-2 text-sm text-foreground">
               <input type="checkbox" checked={form.featured} onChange={e => setForm(f => ({ ...f, featured: e.target.checked }))} className="rounded" />
