@@ -28,7 +28,16 @@ const AdminProducts = () => {
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [newCategoryLabel, setNewCategoryLabel] = useState("");
+  const [showNewCategory, setShowNewCategory] = useState(false);
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["product-categories"],
+    queryFn: async () => {
+      const { data } = await supabase.from("product_categories").select("*").order("label");
+      return data ?? [];
+    },
+  });
 
   const { data: allProducts = [] } = useQuery({
     queryKey: ["admin-products-all"],
@@ -36,6 +45,23 @@ const AdminProducts = () => {
       const { data } = await supabase.from("products").select("*").order("created_at", { ascending: false });
       return data ?? [];
     },
+  });
+
+  const createCategoryMut = useMutation({
+    mutationFn: async (label: string) => {
+      const name = label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+      const { error } = await supabase.from("product_categories").insert({ name, label });
+      if (error) throw error;
+      return name;
+    },
+    onSuccess: (name) => {
+      queryClient.invalidateQueries({ queryKey: ["product-categories"] });
+      setForm(f => ({ ...f, category: name }));
+      setNewCategoryLabel("");
+      setShowNewCategory(false);
+      toast({ title: "Categoria criada!" });
+    },
+    onError: (err: any) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
   });
 
   const products = showInactive ? allProducts : allProducts.filter(p => p.active);
