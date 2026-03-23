@@ -54,6 +54,20 @@ const Dashboard = () => {
     enabled: !!user,
   });
 
+  const { data: promotions = [] } = useQuery({
+    queryKey: ["active-promotions"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("promotions")
+        .select("*")
+        .eq("active", true)
+        .order("created_at", { ascending: false })
+        .limit(3);
+      return data ?? [];
+    },
+    enabled: !!user,
+  });
+
   const displayName = profile?.full_name || user?.email?.split("@")[0] || "Usuário";
   const balance = Number(profile?.balance ?? 0);
 
