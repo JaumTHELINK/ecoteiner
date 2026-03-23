@@ -7,13 +7,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-const categories = ["Todos", "descontos", "vales", "produtos"];
-const categoryLabels: Record<string, string> = {
-  Todos: "Todos",
-  descontos: "Descontos",
-  vales: "Vales",
-  produtos: "Produtos Físicos",
-};
 
 const Loja = () => {
   const { user } = useAuth();
