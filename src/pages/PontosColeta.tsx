@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { MapPin, Phone, Clock, ExternalLink, Info, ChevronDown, ChevronUp, Coins } from "lucide-react";
+import { MapPin, Phone, Clock, ExternalLink, Info, ChevronDown, ChevronUp, Coins, Recycle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
