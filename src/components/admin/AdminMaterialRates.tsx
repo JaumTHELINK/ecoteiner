@@ -57,15 +57,15 @@ const AdminMaterialRates = () => {
     onError: (err: any) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
   });
 
-  const deleteMut = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("material_rates").update({ active: false }).eq("id", id);
+  const toggleActiveMut = useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      const { error } = await supabase.from("material_rates").update({ active }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, { active }) => {
       queryClient.invalidateQueries({ queryKey: ["admin-material-rates"] });
       queryClient.invalidateQueries({ queryKey: ["material-rates"] });
-      toast({ title: "Taxa removida!" });
+      toast({ title: active ? "Taxa reativada!" : "Taxa desativada!" });
     },
   });
 
