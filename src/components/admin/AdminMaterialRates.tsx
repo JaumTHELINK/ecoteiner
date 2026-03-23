@@ -128,7 +128,9 @@ const AdminMaterialRates = () => {
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center gap-1">
                       <Button size="sm" variant="ghost" onClick={() => startEdit(r)}><Pencil className="h-3 w-3" /></Button>
-                      <Button size="sm" variant="ghost" onClick={() => deleteMut.mutate(r.id)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => toggleActiveMut.mutate({ id: r.id, active: !r.active })}>
+                        {r.active ? <Trash2 className="h-3 w-3 text-destructive" /> : <span className="text-xs text-primary font-medium">Reativar</span>}
+                      </Button>
                     </div>
                   </td>
                 </tr>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Megaphone } from "lucide-react";
+import { Plus, Pencil, Trash2, Megaphone, Upload, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Promotion {
@@ -30,6 +30,8 @@ const AdminPromotions = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Promotion | null>(null);
   const [form, setForm] = useState({ title: "", description: "", image_url: "", link_url: "", end_date: "" });
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: promotions = [], isLoading } = useQuery({
     queryKey: ["admin-promotions"],
@@ -39,6 +41,23 @@ const AdminPromotions = () => {
       return (data ?? []) as Promotion[];
     },
   });
+
+  const handleImageUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error } = await supabase.storage.from("promotion-images").upload(fileName, file);
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from("promotion-images").getPublicUrl(fileName);
+      setForm(f => ({ ...f, image_url: urlData.publicUrl }));
+      toast({ title: "Imagem enviada!" });
+    } catch (err: any) {
+      toast({ title: "Erro ao enviar imagem", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -168,8 +187,38 @@ const AdminPromotions = () => {
               <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} />
             </div>
             <div className="space-y-2">
-              <Label>URL da Imagem</Label>
-              <Input value={form.image_url} onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))} placeholder="https://..." />
+              <Label>Imagem</Label>
+              {form.image_url && (
+                <img src={form.image_url} alt="Preview" className="h-28 w-full rounded-lg object-cover" />
+              )}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                  {uploading ? "Enviando..." : "Fazer upload"}
+                </Button>
+                {form.image_url && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setForm(f => ({ ...f, image_url: "" }))}>
+                    Remover
+                  </Button>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImageUpload(file);
+                  e.target.value = "";
+                }}
+              />
             </div>
             <div className="space-y-2">
               <Label>URL do Link</Label>
