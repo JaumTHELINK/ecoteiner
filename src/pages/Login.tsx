@@ -88,15 +88,24 @@ const Login = () => {
             </div>
           </div>
 
+          <div className="flex justify-end">
+            <Link to="/recuperar-senha" className="text-xs text-primary hover:underline">Esqueceu sua senha?</Link>
+          </div>
+
           <Button type="submit" className="w-full" size="lg" disabled={loading}>
             {loading ? "Entrando..." : "Entrar"}
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          Não tem uma conta?{" "}
-          <Link to="/cadastro" className="font-medium text-primary hover:underline">Cadastre-se</Link>
-        </p>
+        <div className="mt-6 space-y-2 text-center text-sm text-muted-foreground">
+          <p>
+            Não tem uma conta?{" "}
+            <Link to="/cadastro" className="font-medium text-primary hover:underline">Cadastre-se</Link>
+          </p>
+          <p>
+            <Link to="/sobre" className="font-medium text-primary hover:underline">Sobre o Ecoteiner</Link>
+          </p>
+        </div>
       </div>
     </div>
   );

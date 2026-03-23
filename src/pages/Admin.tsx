@@ -74,6 +74,8 @@ const Admin = () => {
       {activeTab === "rates" && <AdminMaterialRates />}
       {activeTab === "points" && <AdminCollectionPoints />}
       {activeTab === "transactions" && <AdminTransactions />}
+      {activeTab === "promotions" && <AdminPromotions />}
+      {activeTab === "contacts" && <AdminContacts />}
       {activeTab === "reports" && <AdminReports />}
     </div>
   );
