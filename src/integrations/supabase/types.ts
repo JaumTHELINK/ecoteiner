@@ -127,6 +127,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          is_active: boolean
           level: string
           month_recycled_kg: number
           phone: string | null
@@ -141,6 +142,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          is_active?: boolean
           level?: string
           month_recycled_kg?: number
           phone?: string | null
@@ -155,6 +157,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          is_active?: boolean
           level?: string
           month_recycled_kg?: number
           phone?: string | null
