@@ -28,6 +28,7 @@ const AdminProducts = () => {
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [newCategoryLabel, setNewCategoryLabel] = useState("");
   const [showNewCategory, setShowNewCategory] = useState(false);
 
