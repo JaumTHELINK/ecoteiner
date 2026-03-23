@@ -3,19 +3,18 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, Minus } from "lucide-react";
+import { Search, Pencil, UserCheck, UserX } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 const AdminUsers = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [creditUser, setCreditUser] = useState<string | null>(null);
-  const [creditAmount, setCreditAmount] = useState("");
-  const [creditDesc, setCreditDesc] = useState("");
-  const [creditType, setCreditType] = useState<"credit" | "debit">("credit");
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({ full_name: "", phone: "", cpf: "" });
 
-  const { data: profiles = [], isLoading } = useQuery({
+  const { data: profiles = [] } = useQuery({
     queryKey: ["admin-profiles"],
     queryFn: async () => {
       const { data } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
@@ -23,43 +22,43 @@ const AdminUsers = () => {
     },
   });
 
-  const adjustBalance = useMutation({
-    mutationFn: async ({ userId, amount, type, description }: { userId: string; amount: number; type: "credit" | "debit"; description: string }) => {
-      // Insert transaction
-      const { error: txError } = await supabase.from("transactions").insert({
-        user_id: userId,
-        type,
-        amount,
-        description: description || (type === "credit" ? "Crédito manual (admin)" : "Débito manual (admin)"),
-        category: type === "credit" ? "bonus" : "troca",
-      });
-      if (txError) throw txError;
-
-      // Update balance
-      const profile = profiles.find(p => p.user_id === userId);
-      const currentBalance = Number(profile?.balance ?? 0);
-      const newBalance = type === "credit" ? currentBalance + amount : currentBalance - amount;
-
-      const { error: profError } = await supabase.from("profiles").update({
-        balance: Math.max(0, newBalance),
-      }).eq("user_id", userId);
-      if (profError) throw profError;
+  const updateProfile = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("profiles").update({
+        full_name: editForm.full_name,
+        phone: editForm.phone,
+        cpf: editForm.cpf,
+      }).eq("user_id", editingUser.user_id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-profiles"] });
-      setCreditUser(null);
-      setCreditAmount("");
-      setCreditDesc("");
-      toast({ title: "Saldo atualizado com sucesso!" });
+      setEditingUser(null);
+      toast({ title: "Perfil atualizado!" });
     },
-    onError: (err: any) => {
-      toast({ title: "Erro", description: err.message, variant: "destructive" });
-    },
+    onError: (err: any) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
   });
 
+  const toggleActive = useMutation({
+    mutationFn: async ({ userId, isActive }: { userId: string; isActive: boolean }) => {
+      const { error } = await supabase.from("profiles").update({ is_active: !isActive }).eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-profiles"] });
+      toast({ title: "Status do usuário atualizado!" });
+    },
+    onError: (err: any) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
+  });
+
+  const startEdit = (p: any) => {
+    setEditForm({ full_name: p.full_name || "", phone: p.phone || "", cpf: p.cpf || "" });
+    setEditingUser(p);
+  };
+
   const filtered = profiles.filter(p =>
-    p.full_name.toLowerCase().includes(search.toLowerCase()) ||
-    p.email.toLowerCase().includes(search.toLowerCase())
+    (p.full_name?.toLowerCase() || "").includes(search.toLowerCase()) ||
+    (p.email?.toLowerCase() || "").includes(search.toLowerCase())
   );
 
   return (
@@ -79,74 +78,76 @@ const AdminUsers = () => {
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">CPF</th>
                 <th className="px-4 py-3 text-right font-medium text-muted-foreground">Saldo (FC)</th>
                 <th className="px-4 py-3 text-right font-medium text-muted-foreground">Total Reciclado</th>
+                <th className="px-4 py-3 text-center font-medium text-muted-foreground">Status</th>
                 <th className="px-4 py-3 text-center font-medium text-muted-foreground">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(profile => (
-                <tr key={profile.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                  <td className="px-4 py-3 font-medium text-foreground">{profile.full_name || "—"}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{profile.email}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{profile.cpf || "—"}</td>
-                  <td className="px-4 py-3 text-right tabular-nums font-medium text-foreground">{Number(profile.balance)} FC</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{Number(profile.total_recycled_kg)} kg</td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="flex justify-center gap-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => { setCreditUser(profile.user_id); setCreditType("credit"); }}
-                      >
-                        <Plus className="h-3 w-3" /> Crédito
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => { setCreditUser(profile.user_id); setCreditType("debit"); }}
-                      >
-                        <Minus className="h-3 w-3" /> Débito
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {filtered.map(profile => {
+                const isActive = (profile as any).is_active !== false;
+                return (
+                  <tr key={profile.id} className={`border-b border-border last:border-0 hover:bg-muted/30 ${!isActive ? "opacity-60" : ""}`}>
+                    <td className="px-4 py-3 font-medium text-foreground">{profile.full_name || "—"}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{profile.email}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{profile.cpf || "—"}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium text-foreground">{Number(profile.balance)} FC</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{Number(profile.total_recycled_kg)} kg</td>
+                    <td className="px-4 py-3 text-center">
+                      <Badge variant={isActive ? "default" : "destructive"} className="text-xs">
+                        {isActive ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex justify-center gap-1">
+                        <Button size="sm" variant="ghost" title="Editar" onClick={() => startEdit(profile)}>
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title={isActive ? "Desativar" : "Ativar"}
+                          onClick={() => {
+                            if (isActive && !confirm("Tem certeza que deseja desativar este usuário?")) return;
+                            toggleActive.mutate({ userId: profile.user_id, isActive });
+                          }}
+                        >
+                          {isActive ? <UserX className="h-3 w-3 text-destructive" /> : <UserCheck className="h-3 w-3 text-primary" />}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {filtered.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Nenhum usuário encontrado.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Nenhum usuário encontrado.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Credit/Debit Modal */}
-      {creditUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20" onClick={() => setCreditUser(null)}>
+      {/* Edit Modal */}
+      {editingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20" onClick={() => setEditingUser(null)}>
           <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-card-hover" onClick={e => e.stopPropagation()}>
-            <h3 className="mb-4 text-lg font-semibold text-foreground">
-              {creditType === "credit" ? "Adicionar Crédito" : "Realizar Débito"}
-            </h3>
+            <h3 className="mb-4 text-lg font-semibold text-foreground">Editar Usuário</h3>
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-sm font-medium text-foreground">Valor (FC)</label>
-                <Input type="number" min="0" step="0.01" value={creditAmount} onChange={e => setCreditAmount(e.target.value)} placeholder="0.00" />
+                <label className="mb-1 block text-sm font-medium text-foreground">Nome completo</label>
+                <Input value={editForm.full_name} onChange={e => setEditForm(f => ({ ...f, full_name: e.target.value }))} />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-foreground">Descrição</label>
-                <Input value={creditDesc} onChange={e => setCreditDesc(e.target.value)} placeholder="Motivo do ajuste..." />
+                <label className="mb-1 block text-sm font-medium text-foreground">Telefone</label>
+                <Input value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-foreground">CPF</label>
+                <Input value={editForm.cpf} onChange={e => setEditForm(f => ({ ...f, cpf: e.target.value }))} />
               </div>
               <div className="flex gap-2 pt-2">
-                <Button variant="outline" className="flex-1" onClick={() => setCreditUser(null)}>Cancelar</Button>
-                <Button
-                  className="flex-1"
-                  disabled={!creditAmount || Number(creditAmount) <= 0}
-                  onClick={() => adjustBalance.mutate({
-                    userId: creditUser,
-                    amount: Number(creditAmount),
-                    type: creditType,
-                    description: creditDesc,
-                  })}
-                >
-                  Confirmar
+                <Button variant="outline" className="flex-1" onClick={() => setEditingUser(null)}>Cancelar</Button>
+                <Button className="flex-1" onClick={() => updateProfile.mutate()} disabled={!editForm.full_name}>
+                  Salvar
                 </Button>
               </div>
             </div>

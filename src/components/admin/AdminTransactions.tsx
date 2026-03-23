@@ -16,6 +16,8 @@ import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+type TxMode = "reciclagem" | "debito" | "ajuste";
+
 const AdminTransactions = () => {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -29,6 +31,8 @@ const AdminTransactions = () => {
   const [quantity, setQuantity] = useState("");
   const [selectedPoint, setSelectedPoint] = useState("");
   const [description, setDescription] = useState("");
+  const [txMode, setTxMode] = useState<TxMode>("reciclagem");
+  const [manualAmount, setManualAmount] = useState("");
   const queryClient = useQueryClient();
 
   const { data: transactions = [] } = useQuery({
@@ -39,13 +43,11 @@ const AdminTransactions = () => {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(200);
-
       const userIds = [...new Set((data ?? []).map(t => t.user_id))];
       const { data: profiles } = await supabase
         .from("profiles")
         .select("user_id, full_name, email")
         .in("user_id", userIds);
-
       const profileMap = new Map((profiles ?? []).map(p => [p.user_id, p]));
       return (data ?? []).map(t => ({ ...t, profile: profileMap.get(t.user_id) }));
     },
@@ -54,7 +56,7 @@ const AdminTransactions = () => {
   const { data: profiles = [] } = useQuery({
     queryKey: ["admin-profiles-list"],
     queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("user_id, full_name, email");
+      const { data } = await supabase.from("profiles").select("user_id, full_name, email, balance");
       return data ?? [];
     },
   });
@@ -81,40 +83,74 @@ const AdminTransactions = () => {
     ? (Number(quantity) / selectedMaterialData.quantity_per_fenix) * selectedMaterialData.fenix_per_unit
     : 0;
 
+  const effectiveAmount = txMode === "reciclagem"
+    ? Math.round(calculatedFC * 100) / 100
+    : Number(manualAmount) || 0;
+
   const createTransaction = useMutation({
     mutationFn: async () => {
-      if (!selectedUser || !selectedMaterial || !quantity || Number(quantity) <= 0) {
-        throw new Error("Preencha usuário, material e quantidade.");
+      if (!selectedUser) throw new Error("Selecione um usuário.");
+
+      if (txMode === "reciclagem") {
+        if (!selectedMaterial || !quantity || Number(quantity) <= 0) {
+          throw new Error("Preencha material e quantidade.");
+        }
+      } else {
+        if (!manualAmount || Number(manualAmount) <= 0) {
+          throw new Error("Informe um valor válido.");
+        }
       }
+
+      // Check balance for debits
+      if (txMode === "debito") {
+        const profile = profiles.find(p => p.user_id === selectedUser);
+        if ((profile?.balance ?? 0) < effectiveAmount) {
+          throw new Error(`Saldo insuficiente. Saldo atual: ${profile?.balance ?? 0} FC.`);
+        }
+      }
+
+      const isCredit = txMode !== "debito";
+      const category = txMode === "reciclagem" ? "reciclagem" : txMode === "debito" ? "troca" : "bonus";
 
       const { error: txError } = await supabase.from("transactions").insert({
         user_id: selectedUser,
-        type: "credit",
-        category: "reciclagem",
-        material: selectedMaterialData!.material,
-        weight_kg: Number(quantity),
-        amount: Math.round(calculatedFC * 100) / 100,
+        type: isCredit ? "credit" : "debit",
+        category,
+        material: txMode === "reciclagem" ? selectedMaterialData!.material : null,
+        weight_kg: txMode === "reciclagem" ? Number(quantity) : null,
+        amount: effectiveAmount,
         collection_point_id: selectedPoint || null,
-        description: description || `Reciclagem de ${selectedMaterialData!.material}`,
+        description: description || (txMode === "reciclagem"
+          ? `Reciclagem de ${selectedMaterialData!.material}`
+          : txMode === "debito" ? "Débito/Resgate" : "Ajuste administrativo"),
       });
       if (txError) throw txError;
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("balance")
+        .select("balance, total_recycled_kg")
         .eq("user_id", selectedUser)
         .single();
 
-      const newBalance = (profile?.balance ?? 0) + Math.round(calculatedFC * 100) / 100;
+      const currentBalance = profile?.balance ?? 0;
+      const newBalance = isCredit ? currentBalance + effectiveAmount : currentBalance - effectiveAmount;
+
+      const updatePayload: Record<string, number> = { balance: Math.max(0, newBalance) };
+      if (txMode === "reciclagem" && quantity) {
+        updatePayload.total_recycled_kg = (profile?.total_recycled_kg ?? 0) + Number(quantity);
+      }
+
       const { error: balanceError } = await supabase
         .from("profiles")
-        .update({ balance: newBalance })
+        .update(updatePayload)
         .eq("user_id", selectedUser);
       if (balanceError) throw balanceError;
     },
     onSuccess: () => {
       toast.success("Transação registrada com sucesso!");
       queryClient.invalidateQueries({ queryKey: ["admin-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-profiles-list"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-profiles"] });
       resetForm();
       setOpen(false);
     },
@@ -129,6 +165,8 @@ const AdminTransactions = () => {
     setQuantity("");
     setSelectedPoint("");
     setDescription("");
+    setTxMode("reciclagem");
+    setManualAmount("");
   };
 
   const filtered = useMemo(() => {
@@ -137,13 +175,10 @@ const AdminTransactions = () => {
         t.description?.toLowerCase().includes(search.toLowerCase()) ||
         t.profile?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
         t.profile?.email?.toLowerCase().includes(search.toLowerCase());
-
       const matchesType = typeFilter === "all" || t.type === typeFilter;
-
       const txDate = new Date(t.created_at);
       const matchesFrom = !dateFrom || !isBefore(txDate, startOfDay(dateFrom));
       const matchesTo = !dateTo || !isAfter(txDate, endOfDay(dateTo));
-
       return matchesSearch && matchesType && matchesFrom && matchesTo;
     });
   }, [transactions, search, typeFilter, dateFrom, dateTo]);
@@ -152,7 +187,6 @@ const AdminTransactions = () => {
 
   return (
     <div className="space-y-4">
-      {/* Top bar: search + new transaction */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -161,23 +195,34 @@ const AdminTransactions = () => {
 
         <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" /> Nova Transação
-            </Button>
+            <Button className="gap-2"><Plus className="h-4 w-4" /> Nova Transação</Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Registrar Reciclagem</DialogTitle>
+              <DialogTitle>Nova Transação</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-2">
-              {/* User combobox with search */}
+              {/* Transaction type */}
+              <div className="space-y-2">
+                <Label>Tipo de Transação *</Label>
+                <Select value={txMode} onValueChange={(v) => setTxMode(v as TxMode)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="reciclagem">Crédito — Reciclagem</SelectItem>
+                    <SelectItem value="debito">Débito — Resgate</SelectItem>
+                    <SelectItem value="ajuste">Ajuste Administrativo (crédito)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* User combobox */}
               <div className="space-y-2">
                 <Label>Usuário *</Label>
                 <Popover open={userPopoverOpen} onOpenChange={setUserPopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
                       {selectedProfile
-                        ? (selectedProfile.full_name || selectedProfile.email)
+                        ? `${selectedProfile.full_name || selectedProfile.email} (${selectedProfile.balance} FC)`
                         : "Buscar usuário..."}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -192,15 +237,12 @@ const AdminTransactions = () => {
                             <CommandItem
                               key={p.user_id}
                               value={`${p.full_name} ${p.email}`}
-                              onSelect={() => {
-                                setSelectedUser(p.user_id);
-                                setUserPopoverOpen(false);
-                              }}
+                              onSelect={() => { setSelectedUser(p.user_id); setUserPopoverOpen(false); }}
                             >
                               <Check className={cn("mr-2 h-4 w-4", selectedUser === p.user_id ? "opacity-100" : "opacity-0")} />
                               <div className="flex flex-col">
                                 <span>{p.full_name || "Sem nome"}</span>
-                                <span className="text-xs text-muted-foreground">{p.email}</span>
+                                <span className="text-xs text-muted-foreground">{p.email} — {p.balance} FC</span>
                               </div>
                             </CommandItem>
                           ))}
@@ -211,38 +253,43 @@ const AdminTransactions = () => {
                 </Popover>
               </div>
 
-              <div className="space-y-2">
-                <Label>Material *</Label>
-                <Select value={selectedMaterial} onValueChange={setSelectedMaterial}>
-                  <SelectTrigger><SelectValue placeholder="Selecione o material" /></SelectTrigger>
-                  <SelectContent>
-                    {materials.map(m => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.material} ({m.unit})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Recycling-specific fields */}
+              {txMode === "reciclagem" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Material *</Label>
+                    <Select value={selectedMaterial} onValueChange={setSelectedMaterial}>
+                      <SelectTrigger><SelectValue placeholder="Selecione o material" /></SelectTrigger>
+                      <SelectContent>
+                        {materials.map(m => (
+                          <SelectItem key={m.id} value={m.id}>{m.material} ({m.unit})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Quantidade ({selectedMaterialData?.unit || "kg"}) *</Label>
+                    <Input type="number" min="0" step="0.1" placeholder="Ex: 5.0" value={quantity} onChange={e => setQuantity(e.target.value)} />
+                  </div>
+                  {calculatedFC > 0 && (
+                    <div className="rounded-lg bg-primary/10 p-3 text-center">
+                      <span className="text-sm text-muted-foreground">Valor calculado:</span>
+                      <p className="text-xl font-bold text-primary">+{Math.round(calculatedFC * 100) / 100} FC</p>
+                    </div>
+                  )}
+                </>
+              )}
 
-              <div className="space-y-2">
-                <Label>Quantidade ({selectedMaterialData?.unit || "kg"}) *</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  placeholder="Ex: 5.0"
-                  value={quantity}
-                  onChange={e => setQuantity(e.target.value)}
-                />
-              </div>
-
-              {calculatedFC > 0 && (
-                <div className="rounded-lg bg-primary/10 p-3 text-center">
-                  <span className="text-sm text-muted-foreground">Valor calculado:</span>
-                  <p className="text-xl font-bold text-primary">
-                    +{Math.round(calculatedFC * 100) / 100} FC
-                  </p>
+              {/* Manual amount for debit/adjustment */}
+              {txMode !== "reciclagem" && (
+                <div className="space-y-2">
+                  <Label>Valor (FC) *</Label>
+                  <Input type="number" min="0" step="0.01" placeholder="0.00" value={manualAmount} onChange={e => setManualAmount(e.target.value)} />
+                  {txMode === "debito" && selectedProfile && Number(manualAmount) > (selectedProfile.balance ?? 0) && (
+                    <p className="text-xs text-destructive">
+                      Saldo insuficiente. Saldo atual: {selectedProfile.balance} FC
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -260,17 +307,13 @@ const AdminTransactions = () => {
 
               <div className="space-y-2">
                 <Label>Descrição (opcional)</Label>
-                <Textarea
-                  placeholder="Observações..."
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                />
+                <Textarea placeholder="Observações..." value={description} onChange={e => setDescription(e.target.value)} />
               </div>
 
               <Button
                 className="w-full"
                 onClick={() => createTransaction.mutate()}
-                disabled={createTransaction.isPending || !selectedUser || !selectedMaterial || !quantity}
+                disabled={createTransaction.isPending || !selectedUser || (txMode === "reciclagem" ? (!selectedMaterial || !quantity) : !manualAmount)}
               >
                 {createTransaction.isPending ? "Registrando..." : "Confirmar Transação"}
               </Button>
@@ -279,19 +322,16 @@ const AdminTransactions = () => {
         </Dialog>
       </div>
 
-      {/* Filters row */}
+      {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Tipo" />
-          </SelectTrigger>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os tipos</SelectItem>
             <SelectItem value="credit">Crédito</SelectItem>
             <SelectItem value="debit">Débito</SelectItem>
           </SelectContent>
         </Select>
-
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
@@ -303,7 +343,6 @@ const AdminTransactions = () => {
             <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
           </PopoverContent>
         </Popover>
-
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
@@ -315,11 +354,8 @@ const AdminTransactions = () => {
             <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
           </PopoverContent>
         </Popover>
-
         {hasActiveFilters && (
-          <Button variant="ghost" size="sm" onClick={() => { setTypeFilter("all"); setDateFrom(undefined); setDateTo(undefined); }}>
-            Limpar filtros
-          </Button>
+          <Button variant="ghost" size="sm" onClick={() => { setTypeFilter("all"); setDateFrom(undefined); setDateTo(undefined); }}>Limpar filtros</Button>
         )}
       </div>
 

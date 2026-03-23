@@ -1,17 +1,23 @@
-import { useState } from "react";
-import { Search, Download, ArrowUpCircle, ArrowDownCircle, Wallet, DollarSign } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Search, Download, ArrowUpCircle, ArrowDownCircle, Wallet, DollarSign, CalendarIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { format, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 const Extrato = () => {
   const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [tipo, setTipo] = useState("Todos");
   const [categoria, setCategoria] = useState("Todas");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
 
   const { data: transactions = [] } = useQuery({
     queryKey: ["transactions", user?.id],
@@ -26,16 +32,23 @@ const Extrato = () => {
     enabled: !!user,
   });
 
-  const filtered = transactions.filter((t) => {
-    const matchSearch = t.description.toLowerCase().includes(search.toLowerCase());
-    const matchType = tipo === "Todos" || (tipo === "Recebido" && t.type === "credit") || (tipo === "Gasto" && t.type === "debit");
-    const matchCat = categoria === "Todas" || t.category === categoria.toLowerCase();
-    return matchSearch && matchType && matchCat;
-  });
+  const filtered = useMemo(() => {
+    return transactions.filter((t) => {
+      const matchSearch = t.description.toLowerCase().includes(search.toLowerCase());
+      const matchType = tipo === "Todos" || (tipo === "Recebido" && t.type === "credit") || (tipo === "Gasto" && t.type === "debit");
+      const matchCat = categoria === "Todas" || t.category === categoria.toLowerCase();
+      const txDate = new Date(t.created_at);
+      const matchFrom = !dateFrom || !isBefore(txDate, startOfDay(dateFrom));
+      const matchTo = !dateTo || !isAfter(txDate, endOfDay(dateTo));
+      return matchSearch && matchType && matchCat && matchFrom && matchTo;
+    });
+  }, [transactions, search, tipo, categoria, dateFrom, dateTo]);
 
   const totalReceived = transactions.filter((t) => t.type === "credit").reduce((s, t) => s + Number(t.amount), 0);
   const totalSpent = transactions.filter((t) => t.type === "debit").reduce((s, t) => s + Number(t.amount), 0);
   const currentBalance = totalReceived - totalSpent;
+
+  const hasDateFilter = dateFrom || dateTo;
 
   return (
     <div className="space-y-6">
@@ -76,7 +89,7 @@ const Extrato = () => {
 
       <div className="rounded-xl bg-card p-6 shadow-card">
         <h2 className="mb-4 flex items-center gap-2 font-semibold text-foreground">🔍 Filtros</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">Buscar</label>
             <div className="relative">
@@ -100,6 +113,38 @@ const Extrato = () => {
               <option>Troca</option>
               <option>Bônus</option>
             </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="mb-1 block text-sm font-medium text-foreground">Período</label>
+            <div className="flex gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn("flex-1 justify-start text-left font-normal text-xs", !dateFrom && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-1 h-3 w-3" />
+                    {dateFrom ? format(dateFrom, "dd/MM/yy") : "Início"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn("flex-1 justify-start text-left font-normal text-xs", !dateTo && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-1 h-3 w-3" />
+                    {dateTo ? format(dateTo, "dd/MM/yy") : "Fim"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+            {hasDateFilter && (
+              <Button variant="ghost" size="sm" className="text-xs h-6" onClick={() => { setDateFrom(undefined); setDateTo(undefined); }}>
+                Limpar datas
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -129,11 +174,7 @@ const Extrato = () => {
               <div key={t.id} className="flex items-center justify-between rounded-lg border border-border p-4">
                 <div className="flex items-center gap-3">
                   <div className={`flex h-9 w-9 items-center justify-center rounded-full ${t.type === "credit" ? "bg-accent" : "bg-destructive/10"}`}>
-                    {t.type === "credit" ? (
-                      <ArrowUpCircle className="h-4 w-4 text-primary" />
-                    ) : (
-                      <ArrowDownCircle className="h-4 w-4 text-destructive" />
-                    )}
+                    {t.type === "credit" ? <ArrowUpCircle className="h-4 w-4 text-primary" /> : <ArrowDownCircle className="h-4 w-4 text-destructive" />}
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">{t.description}</p>
