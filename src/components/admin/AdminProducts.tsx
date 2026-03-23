@@ -165,7 +165,34 @@ const AdminProducts = () => {
           <div className="grid gap-3 sm:grid-cols-2">
             <Input placeholder="Nome" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
             <Input placeholder="Preço (FC)" type="number" value={form.price_fc} onChange={e => setForm(f => ({ ...f, price_fc: e.target.value }))} />
-            <Input placeholder="Categoria" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} />
+            <div className="space-y-2">
+              <Select value={form.category} onValueChange={v => {
+                if (v === "__new__") {
+                  setShowNewCategory(true);
+                } else {
+                  setForm(f => ({ ...f, category: v }));
+                }
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(c => (
+                    <SelectItem key={c.id} value={c.name}>{c.label}</SelectItem>
+                  ))}
+                  <SelectItem value="__new__">
+                    <span className="flex items-center gap-1"><PlusCircle className="h-3 w-3" /> Nova categoria</span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {showNewCategory && (
+                <div className="flex gap-2">
+                  <Input placeholder="Nome da nova categoria" value={newCategoryLabel} onChange={e => setNewCategoryLabel(e.target.value)} />
+                  <Button type="button" size="sm" onClick={() => newCategoryLabel && createCategoryMut.mutate(newCategoryLabel)} disabled={!newCategoryLabel}>Criar</Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setShowNewCategory(false)}>Cancelar</Button>
+                </div>
+              )}
+            </div>
             <label className="flex items-center gap-2 text-sm text-foreground">
               <input type="checkbox" checked={form.featured} onChange={e => setForm(f => ({ ...f, featured: e.target.checked }))} className="rounded" />
               Destaque
