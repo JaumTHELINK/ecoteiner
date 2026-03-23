@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Upload, X, Image as ImageIcon, RotateCcw, Eye, EyeOff } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Pencil, Trash2, Upload, X, Image as ImageIcon, RotateCcw, Eye, EyeOff, PlusCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ProductForm {
