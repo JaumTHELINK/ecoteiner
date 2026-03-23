@@ -1,0 +1,1 @@
+ALTER TABLE public.collection_points ADD COLUMN accepted_materials text[] NOT NULL DEFAULT '{}';

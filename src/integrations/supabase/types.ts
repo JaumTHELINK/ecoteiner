@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       collection_points: {
         Row: {
+          accepted_materials: string[]
           active: boolean
           address: string
           created_at: string
@@ -28,6 +29,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          accepted_materials?: string[]
           active?: boolean
           address: string
           created_at?: string
@@ -40,6 +42,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          accepted_materials?: string[]
           active?: boolean
           address?: string
           created_at?: string
