@@ -6,6 +6,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import RecuperarSenha from "./pages/RecuperarSenha";
+import RedefinirSenha from "./pages/RedefinirSenha";
+import Sobre from "./pages/Sobre";
 import Dashboard from "./pages/Dashboard";
 import Loja from "./pages/Loja";
 import ProductDetail from "./pages/ProductDetail";
@@ -27,6 +30,9 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Login />} />
             <Route path="/cadastro" element={<Register />} />
+            <Route path="/recuperar-senha" element={<RecuperarSenha />} />
+            <Route path="/redefinir-senha" element={<RedefinirSenha />} />
+            <Route path="/sobre" element={<Sobre />} />
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/loja" element={<Loja />} />
