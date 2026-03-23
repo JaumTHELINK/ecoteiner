@@ -65,6 +65,18 @@ const AdminProducts = () => {
     onError: (err: any) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
   });
 
+  const deleteCategoryMut = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("product_categories").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["product-categories"] });
+      toast({ title: "Categoria excluída!" });
+    },
+    onError: (err: any) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
+  });
+
   const products = showInactive ? allProducts : allProducts.filter(p => p.active);
 
   const uploadImage = async (file: File): Promise<string> => {
