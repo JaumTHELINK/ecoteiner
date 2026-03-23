@@ -22,6 +22,21 @@ const Loja = () => {
     enabled: !!user,
   });
 
+  const { data: dbCategories = [] } = useQuery({
+    queryKey: ["product-categories"],
+    queryFn: async () => {
+      const { data } = await supabase.from("product_categories").select("*").eq("active", true).order("label");
+      return data ?? [];
+    },
+    enabled: !!user,
+  });
+
+  const categories = ["Todos", ...dbCategories.map(c => c.name)];
+  const categoryLabels: Record<string, string> = {
+    Todos: "Todos",
+    ...Object.fromEntries(dbCategories.map(c => [c.name, c.label])),
+  };
+
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
     queryFn: async () => {
