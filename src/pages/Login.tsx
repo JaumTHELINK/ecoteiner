@@ -7,6 +7,15 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+const translateError = (msg: string): string => {
+  if (msg.includes("Invalid login credentials")) return "Email ou senha incorretos.";
+  if (msg.includes("Email not confirmed")) return "Confirme seu email antes de entrar. Verifique sua caixa de entrada.";
+  if (msg.includes("Too many requests")) return "Muitas tentativas. Aguarde alguns minutos e tente novamente.";
+  if (msg.includes("User not found")) return "Usuário não encontrado.";
+  if (msg.includes("account is disabled") || msg.includes("banned")) return "Sua conta foi desativada. Entre em contato com o administrador.";
+  return msg;
+};
+
 const Login = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -18,19 +27,31 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      toast({
-        title: "Erro ao entrar",
-        description: error.message === "Invalid login credentials"
-          ? "Email ou senha incorretos."
-          : error.message,
-        variant: "destructive",
-      });
-    } else {
-      navigate("/dashboard");
+      toast({ title: "Erro ao entrar", description: translateError(error.message), variant: "destructive" });
+      setLoading(false);
+      return;
     }
+
+    // Check if user is active
+    if (data.user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("is_active")
+        .eq("user_id", data.user.id)
+        .single();
+
+      if (profile && profile.is_active === false) {
+        await supabase.auth.signOut();
+        toast({ title: "Conta desativada", description: "Sua conta foi desativada pelo administrador. Entre em contato para mais informações.", variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+    }
+
+    navigate("/dashboard");
     setLoading(false);
   };
 
@@ -47,9 +68,7 @@ const Login = () => {
 
         <div className="mb-6 text-center">
           <h2 className="text-lg font-semibold text-foreground">Entrar na sua conta</h2>
-          <p className="text-sm text-muted-foreground">
-            Digite suas credenciais para acessar o sistema
-          </p>
+          <p className="text-sm text-muted-foreground">Digite suas credenciais para acessar o sistema</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -57,15 +76,7 @@ const Login = () => {
             <Label htmlFor="email">Email</Label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                className="pl-10"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+              <Input id="email" type="email" placeholder="seu@email.com" className="pl-10" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
           </div>
 
@@ -73,15 +84,7 @@ const Login = () => {
             <Label htmlFor="password">Senha</Label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                className="pl-10"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <Input id="password" type="password" placeholder="••••••••" className="pl-10" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
           </div>
 
@@ -92,9 +95,7 @@ const Login = () => {
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Não tem uma conta?{" "}
-          <Link to="/cadastro" className="font-medium text-primary hover:underline">
-            Cadastre-se
-          </Link>
+          <Link to="/cadastro" className="font-medium text-primary hover:underline">Cadastre-se</Link>
         </p>
       </div>
     </div>

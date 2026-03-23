@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Pencil, Trash2, RotateCcw, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface PointForm {
@@ -21,14 +22,17 @@ const AdminCollectionPoints = () => {
   const [editing, setEditing] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<PointForm>(emptyForm);
+  const [showInactive, setShowInactive] = useState(false);
 
-  const { data: points = [] } = useQuery({
-    queryKey: ["admin-points"],
+  const { data: allPoints = [] } = useQuery({
+    queryKey: ["admin-points-all"],
     queryFn: async () => {
       const { data } = await supabase.from("collection_points").select("*").order("name");
       return data ?? [];
     },
   });
+
+  const points = showInactive ? allPoints : allPoints.filter(p => p.active);
 
   const upsert = useMutation({
     mutationFn: async () => {
@@ -41,7 +45,7 @@ const AdminCollectionPoints = () => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-points"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-points-all"] });
       setShowForm(false);
       setEditing(null);
       setForm(emptyForm);
@@ -50,14 +54,14 @@ const AdminCollectionPoints = () => {
     onError: (err: any) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
   });
 
-  const deleteMut = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("collection_points").update({ active: false }).eq("id", id);
+  const toggleActive = useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      const { error } = await supabase.from("collection_points").update({ active: !active }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-points"] });
-      toast({ title: "Ponto removido!" });
+      queryClient.invalidateQueries({ queryKey: ["admin-points-all"] });
+      toast({ title: "Status atualizado!" });
     },
   });
 
@@ -69,7 +73,11 @@ const AdminCollectionPoints = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        <Button variant="outline" size="sm" onClick={() => setShowInactive(!showInactive)}>
+          {showInactive ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+          {showInactive ? "Ocultar inativos" : "Mostrar inativos"}
+        </Button>
         <Button onClick={() => { setForm(emptyForm); setEditing(null); setShowForm(true); }}>
           <Plus className="mr-2 h-4 w-4" /> Novo Ponto
         </Button>
@@ -100,20 +108,37 @@ const AdminCollectionPoints = () => {
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Endereço</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Telefone</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Horário</th>
+                <th className="px-4 py-3 text-center font-medium text-muted-foreground">Status</th>
                 <th className="px-4 py-3 text-center font-medium text-muted-foreground">Ações</th>
               </tr>
             </thead>
             <tbody>
               {points.map(p => (
-                <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                <tr key={p.id} className={`border-b border-border last:border-0 hover:bg-muted/30 ${!p.active ? "opacity-60" : ""}`}>
                   <td className="px-4 py-3 font-medium text-foreground">{p.name}</td>
                   <td className="px-4 py-3 text-muted-foreground">{p.address}</td>
                   <td className="px-4 py-3 text-muted-foreground">{p.phone || "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground">{p.hours || "—"}</td>
                   <td className="px-4 py-3 text-center">
+                    <Badge variant={p.active ? "default" : "destructive"} className="text-xs">
+                      {p.active ? "Ativo" : "Inativo"}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3 text-center">
                     <div className="flex justify-center gap-1">
                       <Button size="sm" variant="ghost" onClick={() => startEdit(p)}><Pencil className="h-3 w-3" /></Button>
-                      <Button size="sm" variant="ghost" onClick={() => deleteMut.mutate(p.id)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+                      {p.active ? (
+                        <Button size="sm" variant="ghost" onClick={() => {
+                          if (!confirm("Desativar este ponto de coleta?")) return;
+                          toggleActive.mutate({ id: p.id, active: p.active });
+                        }}>
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="ghost" onClick={() => toggleActive.mutate({ id: p.id, active: p.active })}>
+                          <RotateCcw className="h-3 w-3 text-primary" />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

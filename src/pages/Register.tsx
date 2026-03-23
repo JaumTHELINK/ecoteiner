@@ -7,6 +7,45 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+const formatCPF = (value: string) => {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  return digits
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+};
+
+const formatPhone = (value: string) => {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+};
+
+const validateCPF = (cpf: string): boolean => {
+  const digits = cpf.replace(/\D/g, "");
+  if (digits.length !== 11) return false;
+  if (/^(\d)\1+$/.test(digits)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(digits[i]) * (10 - i);
+  let rest = (sum * 10) % 11;
+  if (rest === 10) rest = 0;
+  if (rest !== parseInt(digits[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(digits[i]) * (11 - i);
+  rest = (sum * 10) % 11;
+  if (rest === 10) rest = 0;
+  return rest === parseInt(digits[10]);
+};
+
+const translateError = (msg: string): string => {
+  if (msg.includes("User already registered")) return "Este e-mail já está cadastrado. Tente fazer login.";
+  if (msg.includes("Password should be at least")) return "A senha deve ter pelo menos 6 caracteres.";
+  if (msg.includes("Unable to validate email")) return "Endereço de e-mail inválido.";
+  if (msg.includes("Signup requires a valid password")) return "Informe uma senha válida.";
+  return msg;
+};
+
 const Register = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -14,45 +53,46 @@ const Register = () => {
   const [form, setForm] = useState({
     name: "", email: "", phone: "", cpf: "", password: "", confirmPassword: "",
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const update = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  const update = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value;
+    if (field === "cpf") value = formatCPF(value);
+    if (field === "phone") value = formatPhone(value);
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setErrors((prev) => ({ ...prev, [field]: "" }));
+  };
+
+  const validate = (): boolean => {
+    const errs: Record<string, string> = {};
+    if (!form.name.trim()) errs.name = "Nome é obrigatório.";
+    if (!form.email.trim()) errs.email = "Email é obrigatório.";
+    if (!form.phone.trim() || form.phone.replace(/\D/g, "").length < 10) errs.phone = "Telefone inválido. Use (XX) XXXXX-XXXX.";
+    if (!validateCPF(form.cpf)) errs.cpf = "CPF inválido.";
+    if (form.password.length < 6) errs.password = "A senha deve ter pelo menos 6 caracteres.";
+    if (form.password !== form.confirmPassword) errs.confirmPassword = "As senhas não coincidem.";
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (form.password !== form.confirmPassword) {
-      toast({ title: "Erro", description: "As senhas não coincidem.", variant: "destructive" });
-      return;
-    }
-
-    if (form.password.length < 6) {
-      toast({ title: "Erro", description: "A senha deve ter pelo menos 6 caracteres.", variant: "destructive" });
-      return;
-    }
+    if (!validate()) return;
 
     setLoading(true);
-
     const { error } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
       options: {
-        data: {
-          full_name: form.name,
-          phone: form.phone,
-          cpf: form.cpf,
-        },
+        data: { full_name: form.name, phone: form.phone, cpf: form.cpf },
         emailRedirectTo: window.location.origin,
       },
     });
 
     if (error) {
-      toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
+      toast({ title: "Erro ao criar conta", description: translateError(error.message), variant: "destructive" });
     } else {
-      toast({
-        title: "Conta criada com sucesso!",
-        description: "Verifique seu email para confirmar o cadastro.",
-      });
+      toast({ title: "Conta criada com sucesso!", description: "Verifique seu email para confirmar o cadastro." });
       navigate("/dashboard");
     }
     setLoading(false);
@@ -61,8 +101,8 @@ const Register = () => {
   const fields = [
     { id: "name", label: "Nome completo *", icon: User, placeholder: "Seu nome completo", type: "text" },
     { id: "email", label: "Email *", icon: Mail, placeholder: "seu@email.com", type: "email" },
-    { id: "phone", label: "Telefone", icon: Phone, placeholder: "(11) 99999-9999", type: "tel" },
-    { id: "cpf", label: "CPF", icon: CreditCard, placeholder: "000.000.000-00", type: "text" },
+    { id: "phone", label: "Telefone *", icon: Phone, placeholder: "(11) 99999-9999", type: "tel" },
+    { id: "cpf", label: "CPF *", icon: CreditCard, placeholder: "000.000.000-00", type: "text" },
     { id: "password", label: "Senha *", icon: Lock, placeholder: "••••••", type: "password" },
     { id: "confirmPassword", label: "Confirmar senha *", icon: Lock, placeholder: "••••••••", type: "password" },
   ];
@@ -85,7 +125,7 @@ const Register = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {fields.map(({ id, label, icon: Icon, placeholder, type }) => (
-            <div key={id} className="space-y-2">
+            <div key={id} className="space-y-1">
               <Label htmlFor={id}>{label}</Label>
               <div className="relative">
                 <Icon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -93,12 +133,13 @@ const Register = () => {
                   id={id}
                   type={type}
                   placeholder={placeholder}
-                  className="pl-10"
+                  className={`pl-10 ${errors[id] ? "border-destructive" : ""}`}
                   value={form[id as keyof typeof form]}
                   onChange={update(id)}
-                  required={label.includes("*")}
+                  required
                 />
               </div>
+              {errors[id] && <p className="text-xs text-destructive">{errors[id]}</p>}
             </div>
           ))}
 
