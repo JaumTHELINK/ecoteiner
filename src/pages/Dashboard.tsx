@@ -127,6 +127,33 @@ const Dashboard = () => {
         ))}
       </div>
 
+      {/* Promotions Banner */}
+      {promotions.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="flex items-center gap-2 font-semibold text-foreground">
+            <Megaphone className="h-5 w-5 text-muted-foreground" /> Promoções
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {promotions.map((promo: any) => (
+              <div key={promo.id} className="rounded-xl border border-border bg-card overflow-hidden shadow-card hover:shadow-card-hover transition-shadow">
+                {promo.image_url && (
+                  <img src={promo.image_url} alt={promo.title} className="h-32 w-full object-cover" />
+                )}
+                <div className="p-4">
+                  <h3 className="font-semibold text-foreground">{promo.title}</h3>
+                  {promo.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{promo.description}</p>}
+                  {promo.link_url && (
+                    <a href={promo.link_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline mt-2 inline-block">
+                      Saiba mais →
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 rounded-xl bg-card p-6 shadow-card">
           <div className="mb-4 flex items-center justify-between">
